@@ -1,4 +1,6 @@
 <title>Попчик</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
   /* ============ TOKENS ============ */
   :root{
@@ -601,15 +603,51 @@
     }
   }
 
-  function initStore(){
-    wireChat();
-    wireList("popchik_plans", false, "planScroll", "planForm", "planInput");
-    wireList("popchik_wishes", true, "wishScroll", "wishForm", "wishInput");
-    wireMemories();
+  /* Fill this in with the config object shown at the end of Firebase
+     setup (Project settings -> your apps -> web app). Leave it null to
+     keep the reliable zero-setup local-only mode. */
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyD8UWHHuTIz0VcTh8afh-Z5aFSeLD69iY8",
+    authDomain: "addabbs-34f41.firebaseapp.com",
+    projectId: "addabbs-34f41",
+    storageBucket: "addabbs-34f41.firebasestorage.app",
+    messagingSenderId: "684776094572",
+    appId: "1:684776094572:web:959cffb940d214fc885149",
+    measurementId: "G-4JKYC7Y4K6"
+  };
+
+  function initFirestore(){
+    if (!FIREBASE_CONFIG || !window.firebase) return null;
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      return firebase.firestore();
+    } catch(e){ return null; }
   }
 
-  /* ================= CHAT ================= */
-  function wireChat(){
+  function initStore(){
+    var fsDb = initFirestore();
+    if (fsDb){
+      wireChatFirestore(fsDb);
+      wireListFirestore(fsDb, "plans", false, "planScroll", "planForm", "planInput");
+      wireListFirestore(fsDb, "wishes", true, "wishScroll", "wishForm", "wishInput");
+      wireMemoriesFirestore(fsDb);
+    } else {
+      wireChatLocal();
+      wireListLocal("popchik_plans", false, "planScroll", "planForm", "planInput");
+      wireListLocal("popchik_wishes", true, "wishScroll", "wishForm", "wishInput");
+      wireMemoriesLocal();
+    }
+  }
+
+  function firestoreErrorMessage(err){
+    if (!err) return "Что-то пошло не так. Попробуй ещё раз.";
+    if (err.code === "resource-exhausted") return "Слишком много действий подряд — подожди немного.";
+    if (err.code === "permission-denied") return "Нет доступа к общей памяти. Напишите мне, чтобы разобраться.";
+    return "Не получилось сохранить. Попробуй ещё раз.";
+  }
+
+  /* ================= CHAT (local, one device) ================= */
+  function wireChatLocal(){
     var scroll = document.getElementById("chatScroll");
     var form = document.getElementById("chatForm");
     var input = document.getElementById("chatInput");
@@ -712,8 +750,8 @@
     render();
   }
 
-  /* ================= PLANS / WISHES (shared list logic) ================= */
-  function wireList(storeKey, isWish, scrollId, formId, inputId){
+  /* ================= PLANS / WISHES, local (one device) ================= */
+  function wireListLocal(storeKey, isWish, scrollId, formId, inputId){
     var scroll = document.getElementById(scrollId);
     var form = document.getElementById(formId);
     var input = document.getElementById(inputId);
@@ -784,8 +822,8 @@
     render();
   }
 
-  /* ================= MEMORIES ================= */
-  function wireMemories(){
+  /* ================= MEMORIES, local (one device) ================= */
+  function wireMemoriesLocal(){
     var storeKey = "popchik_memories";
     var grid = document.getElementById("memGrid");
     var addBtn = document.getElementById("memAddBtn");
@@ -896,6 +934,317 @@
     }
 
     render();
+  }
+
+  /* ================= CHAT (Firestore, synced across devices) ================= */
+  function wireChatFirestore(fsDb){
+    var scroll = document.getElementById("chatScroll");
+    var form = document.getElementById("chatForm");
+    var input = document.getElementById("chatInput");
+    var sendBtn = document.getElementById("sendBtn");
+
+    function autoGrow(){
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 120) + "px";
+    }
+    input.addEventListener("input", function(){
+      autoGrow();
+      sendBtn.disabled = !input.value.trim();
+    });
+    input.addEventListener("keydown", function(e){
+      if (e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    var REACTIONS = [
+      { key:"popchik", label:"Попчик", emoji:"🍬" },
+      { key:"pripopka", label:"Припопка", emoji:"💛" },
+      { key:"otpopka", label:"Отпопка", emoji:"💢" }
+    ];
+
+    function toggleReaction(dateKey, msgId, key){
+      var ref = fsDb.collection("chat_days").doc(dateKey);
+      ref.get().then(function(snap){
+        if (!snap.exists) return;
+        var data = snap.data();
+        var messages = (data.messages || []).map(function(m){
+          if (m.id !== msgId) return m;
+          var reactions = Object.assign({}, m.reactions);
+          var list = (reactions[key] || []).slice();
+          var idx = list.indexOf(state.who);
+          if (idx >= 0) list.splice(idx, 1); else list.push(state.who);
+          reactions[key] = list;
+          return Object.assign({}, m, { reactions: reactions });
+        });
+        return ref.set(Object.assign({}, data, { messages: messages }));
+      }).catch(function(err){ showToast(firestoreErrorMessage(err)); });
+    }
+
+    function render(days){
+      scroll.innerHTML = "";
+      var all = [];
+      days.forEach(function(day){
+        (day.messages || []).forEach(function(m){ all.push(Object.assign({}, m, { dateKey: day.date })); });
+      });
+      all.sort(function(a,b){ return a.ts - b.ts; });
+
+      if (all.length === 0){
+        scroll.appendChild(el("p", "state-msg", "Здесь пока тихо. Напиши первое сообщение! 💌"));
+        return;
+      }
+
+      var lastDivider = null;
+      all.forEach(function(m){
+        if (m.dateKey !== lastDivider){
+          scroll.appendChild(el("div", "day-divider", formatDivider(m.dateKey)));
+          lastDivider = m.dateKey;
+        }
+        var mine = m.from === state.who;
+        var row = el("div", "bubble-row " + (mine ? "mine" : "theirs"));
+        var bubble = el("div", "bubble", m.text);
+        row.appendChild(bubble);
+        row.appendChild(el("div", "bubble-time", formatTime(m.ts)));
+
+        var reacts = el("div", "reactions");
+        REACTIONS.forEach(function(r){
+          var list = (m.reactions && m.reactions[r.key]) || [];
+          var chip = el("button", "chip" + (list.indexOf(state.who) >= 0 ? " active" : ""));
+          chip.type = "button";
+          chip.appendChild(document.createTextNode(r.emoji + " " + r.label + " "));
+          if (list.length) chip.appendChild(el("span", "n", String(list.length)));
+          chip.addEventListener("click", function(){ toggleReaction(m.dateKey, m.id, r.key); });
+          reacts.appendChild(chip);
+        });
+        row.appendChild(reacts);
+        scroll.appendChild(row);
+      });
+      requestAnimationFrame(function(){ scroll.scrollTop = scroll.scrollHeight; });
+    }
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      sendBtn.disabled = true;
+      input.value = "";
+      autoGrow();
+      var dateKey = todayKey();
+      var ref = fsDb.collection("chat_days").doc(dateKey);
+      ref.get().then(function(snap){
+        var existing = snap.exists ? (snap.data().messages || []) : [];
+        var msg = { id: uid(), from: state.who, text: text, ts: Date.now(), reactions: {} };
+        return ref.set({ date: dateKey, messages: existing.concat([msg]) });
+      }).catch(function(err){
+        showToast(firestoreErrorMessage(err));
+        input.value = text;
+        autoGrow();
+      }).finally(function(){
+        sendBtn.disabled = !input.value.trim();
+      });
+    });
+
+    fsDb.collection("chat_days").orderBy("date", "desc").limit(60).onSnapshot(function(snap){
+      var days = snap.docs.map(function(d){ return d.data(); }).reverse();
+      render(days);
+    }, function(err){
+      scroll.innerHTML = "";
+      scroll.appendChild(el("p", "state-msg", firestoreErrorMessage(err)));
+    });
+  }
+
+  /* ================= PLANS / WISHES (Firestore, synced across devices) ================= */
+  function wireListFirestore(fsDb, collectionName, isWish, scrollId, formId, inputId){
+    var scroll = document.getElementById(scrollId);
+    var form = document.getElementById(formId);
+    var input = document.getElementById(inputId);
+    var addBtn = form.querySelector("button");
+    var doneField = isWish ? "fulfilled" : "done";
+
+    input.addEventListener("input", function(){ addBtn.disabled = !input.value.trim(); });
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      addBtn.disabled = true;
+      var data = { text: text, addedBy: state.who, createdAt: Date.now() };
+      data[doneField] = false;
+      fsDb.collection(collectionName).add(data).catch(function(err){
+        showToast(firestoreErrorMessage(err));
+        input.value = text;
+        addBtn.disabled = false;
+      });
+    });
+
+    function toggle(id, current){
+      var patch = {};
+      patch[doneField] = !current;
+      fsDb.collection(collectionName).doc(id).update(patch).catch(function(err){ showToast(firestoreErrorMessage(err)); });
+    }
+    function remove(id){
+      fsDb.collection(collectionName).doc(id).delete().catch(function(err){ showToast(firestoreErrorMessage(err)); });
+    }
+
+    function render(snap){
+      scroll.innerHTML = "";
+      if (snap.empty){
+        scroll.appendChild(el("p", "state-msg", isWish ? "Вишлист пуст — самое время помечтать ⭐" : "Планов пока нет — придумайте первый вместе"));
+        return;
+      }
+      snap.docs.forEach(function(doc){
+        var d = doc.data();
+        var done = !!d[doneField];
+        var item = el("div", "list-item" + (isWish ? " wish" : "") + (done ? " done" : ""));
+
+        var toggleBtn = el("button", "toggle" + (done ? " done" : ""));
+        toggleBtn.type = "button";
+        toggleBtn.setAttribute("aria-label", isWish ? "Исполнено" : "Готово");
+        toggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        toggleBtn.addEventListener("click", function(){ toggle(doc.id, done); });
+
+        var body = el("div", "body");
+        body.appendChild(el("div", "text", d.text || ""));
+        var who = d.addedBy || "—";
+        body.appendChild(el("div", "meta", who + " · " + formatAgo(d.createdAt || 0)));
+
+        var delBtn = el("button", "del", "✕");
+        delBtn.type = "button";
+        delBtn.setAttribute("aria-label", "Удалить");
+        delBtn.addEventListener("click", function(){ remove(doc.id); });
+
+        item.appendChild(toggleBtn);
+        item.appendChild(body);
+        item.appendChild(delBtn);
+        scroll.appendChild(item);
+      });
+    }
+
+    fsDb.collection(collectionName).orderBy("createdAt", "asc").limit(500).onSnapshot(render, function(err){
+      scroll.innerHTML = "";
+      scroll.appendChild(el("p", "state-msg", firestoreErrorMessage(err)));
+    });
+  }
+
+  /* ================= MEMORIES (Firestore, synced across devices) ================= */
+  function wireMemoriesFirestore(fsDb){
+    var grid = document.getElementById("memGrid");
+    var addBtn = document.getElementById("memAddBtn");
+    var fileInput = document.getElementById("memFileInput");
+    var uploadPanel = document.getElementById("uploadPanel");
+    var uploadPreview = document.getElementById("uploadPreview");
+    var uploadCaption = document.getElementById("uploadCaption");
+    var uploadCancel = document.getElementById("uploadCancel");
+    var uploadSave = document.getElementById("uploadSave");
+    var lightbox = document.getElementById("lightbox");
+    var lightboxImg = document.getElementById("lightboxImg");
+    var lightboxCaption = document.getElementById("lightboxCaption");
+    var lightboxMeta = document.getElementById("lightboxMeta");
+    var lightboxClose = document.getElementById("lightboxClose");
+    var pendingDataUrl = null;
+
+    addBtn.addEventListener("click", function(){ fileInput.click(); });
+
+    fileInput.addEventListener("change", function(){
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      compressImage(file).then(function(dataUrl){
+        pendingDataUrl = dataUrl;
+        uploadPreview.src = dataUrl;
+        uploadCaption.value = "";
+        uploadPanel.hidden = false;
+      }).catch(function(){
+        showToast("Не получилось обработать фото. Попробуй другое.");
+      });
+    });
+
+    function compressImage(file){
+      return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(e){
+          var img = new Image();
+          img.onload = function(){
+            var w = img.width, h = img.height, maxDim = 1400;
+            if (w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else if (h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+            var canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            var quality = 0.82;
+            var dataUrl = canvas.toDataURL("image/jpeg", quality);
+            while (dataUrl.length > 700000 && quality > 0.3){
+              quality -= 0.1;
+              dataUrl = canvas.toDataURL("image/jpeg", quality);
+            }
+            if (dataUrl.length > 900000){ reject(new Error("too_big")); return; }
+            resolve(dataUrl);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function closeUpload(){ uploadPanel.hidden = true; pendingDataUrl = null; }
+    uploadCancel.addEventListener("click", closeUpload);
+    uploadSave.addEventListener("click", function(){
+      if (!pendingDataUrl) return;
+      uploadSave.disabled = true;
+      fsDb.collection("memories").add({
+        image: pendingDataUrl,
+        caption: uploadCaption.value.trim(),
+        addedBy: state.who,
+        createdAt: Date.now()
+      }).then(function(){
+        closeUpload();
+      }).catch(function(err){
+        showToast(firestoreErrorMessage(err));
+      }).finally(function(){
+        uploadSave.disabled = false;
+      });
+    });
+
+    lightboxClose.addEventListener("click", function(){ lightbox.hidden = true; });
+    lightbox.addEventListener("click", function(e){ if (e.target === lightbox) lightbox.hidden = true; });
+
+    function render(snap){
+      grid.innerHTML = "";
+      if (snap.empty){
+        var msg = el("p", "state-msg", "Пока пусто — добавьте первое воспоминание!");
+        msg.style.gridColumn = "1 / -1";
+        grid.appendChild(msg);
+        return;
+      }
+      snap.docs.forEach(function(doc){
+        var d = doc.data();
+        var thumb = el("button", "mem-thumb");
+        thumb.type = "button";
+        var img = document.createElement("img");
+        img.src = d.image;
+        img.alt = d.caption || "Воспоминание";
+        thumb.appendChild(img);
+        thumb.addEventListener("click", function(){
+          lightboxImg.src = d.image;
+          lightboxCaption.textContent = d.caption || "";
+          lightboxCaption.hidden = !d.caption;
+          lightboxMeta.textContent = (d.addedBy || "—") + " · " + formatAgo(d.createdAt || 0);
+          lightbox.hidden = false;
+        });
+        grid.appendChild(thumb);
+      });
+    }
+
+    fsDb.collection("memories").orderBy("createdAt", "desc").limit(300).onSnapshot(render, function(err){
+      grid.innerHTML = "";
+      var msg = el("p", "state-msg", firestoreErrorMessage(err));
+      msg.style.gridColumn = "1 / -1";
+      grid.appendChild(msg);
+    });
   }
 })();
 </script>
