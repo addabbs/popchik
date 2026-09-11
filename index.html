@@ -178,6 +178,10 @@
   .topbar-titles .app-name{ font-size:1rem; }
   .topbar-titles .tagline{ font-size:.72rem; }
 
+  .sync-bar{ font-size:.68rem; text-align:center; padding:5px 8px; font-weight:600; letter-spacing:.01em; flex:0 0 auto; }
+  .sync-bar.online{ background:color-mix(in srgb, var(--ocean-1) 14%, var(--surface)); color:var(--ocean-1); }
+  .sync-bar.offline{ background:var(--surface-2); color:var(--ink-soft); }
+
   .content{ flex:1; min-height:0; position:relative; }
   .tab-panel{ position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
   .tab-panel[hidden]{ display:none; }
@@ -339,6 +343,7 @@
       </div>
       <button class="who-you-are" id="whoSwitch">Ты: <b id="whoLabel">—</b><br>сменить</button>
     </header>
+    <div class="sync-bar" id="syncBar" hidden></div>
 
     <div class="content">
       <!-- CHAT -->
@@ -626,17 +631,23 @@
 
   function initStore(){
     var fsDb = initFirestore();
+    var syncBar = document.getElementById("syncBar");
     if (fsDb){
+      syncBar.textContent = "🔗 Синхронизировано между устройствами";
+      syncBar.className = "sync-bar online";
       wireChatFirestore(fsDb);
       wireListFirestore(fsDb, "plans", false, "planScroll", "planForm", "planInput");
       wireListFirestore(fsDb, "wishes", true, "wishScroll", "wishForm", "wishInput");
       wireMemoriesFirestore(fsDb);
     } else {
+      syncBar.textContent = "📱 Сохраняется только на этом устройстве";
+      syncBar.className = "sync-bar offline";
       wireChatLocal();
       wireListLocal("popchik_plans", false, "planScroll", "planForm", "planInput");
       wireListLocal("popchik_wishes", true, "wishScroll", "wishForm", "wishInput");
       wireMemoriesLocal();
     }
+    syncBar.hidden = false;
   }
 
   function firestoreErrorMessage(err){
