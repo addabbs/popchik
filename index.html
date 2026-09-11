@@ -1,0 +1,901 @@
+<title>Попчик</title>
+<style>
+  /* ============ TOKENS ============ */
+  :root{
+    --ocean-1:#0E7C86;
+    --ocean-2:#6FD6E0;
+    --surface:#FFFBF2;
+    --surface-2:#FFF3D9;
+    --bubble-in:#EAF7F5;
+    --sun:#FFC94A;
+    --sun-strong:#F2A93B;
+    --coral:#FF7A59;
+    --ink:#163B3E;
+    --ink-soft:#5C7A7C;
+    --line:#E7E0CE;
+    --shadow: 0 20px 60px rgba(14,60,64,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ocean-1:#071619;
+      --ocean-2:#12383E;
+      --surface:#102628;
+      --surface-2:#153030;
+      --bubble-in:#173838;
+      --sun:#FFD166;
+      --sun-strong:#F5B93F;
+      --coral:#FF8F6B;
+      --ink:#F3F6EE;
+      --ink-soft:#9FC1BE;
+      --line:#234548;
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ocean-1:#071619;
+    --ocean-2:#12383E;
+    --surface:#102628;
+    --surface-2:#153030;
+    --bubble-in:#173838;
+    --sun:#FFD166;
+    --sun-strong:#F5B93F;
+    --coral:#FF8F6B;
+    --ink:#F3F6EE;
+    --ink-soft:#9FC1BE;
+    --line:#234548;
+    --shadow: 0 20px 60px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:
+      radial-gradient(60% 50% at 15% 8%, color-mix(in srgb, var(--sun) 20%, transparent), transparent 60%),
+      linear-gradient(160deg, var(--ocean-1), var(--ocean-2));
+    color:var(--ink);
+    font-family:'Rubik', system-ui, sans-serif;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    position:relative;
+    overflow-x:hidden;
+  }
+  h1,h2,h3,.display{ font-family:'Unbounded', system-ui, sans-serif; text-wrap:balance; }
+  button{ font-family:inherit; }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  }
+
+  /* decorative bubbles on the ocean backdrop */
+  .blob{ position:fixed; border-radius:50%; filter:blur(2px); opacity:.35; pointer-events:none; }
+  .blob--a{ width:120px; height:120px; background:var(--sun); top:8%; left:10%; opacity:.18; }
+  .blob--b{ width:70px; height:70px; background:#fff; top:65%; left:6%; opacity:.12; }
+  .blob--c{ width:46px; height:46px; background:#fff; top:20%; right:10%; opacity:.15; }
+  .blob--d{ width:160px; height:160px; background:var(--coral); bottom:4%; right:6%; opacity:.10; }
+
+  /* ============ APP SHELL ============ */
+  .app-shell{
+    position:relative;
+    width:100%;
+    max-width:460px;
+    height:100vh;
+    height:100dvh;
+    max-height:900px;
+    background:var(--surface);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  @media (min-width:540px){
+    .app-shell{ margin:20px; border-radius:32px; height:min(860px, 92dvh); }
+  }
+
+  .screen{ position:absolute; inset:0; display:flex; flex-direction:column; background:var(--surface); }
+  .screen[hidden]{ display:none; }
+
+  /* ============ GATE + WELCOME + WHO ============ */
+  .center-screen{
+    align-items:center; justify-content:center; text-align:center;
+    padding:14vh 30px 40px;
+    gap:22px;
+    background:
+      radial-gradient(70% 50% at 50% 0%, color-mix(in srgb, var(--sun) 22%, transparent), transparent 65%),
+      var(--surface);
+  }
+  .mark{
+    width:76px; height:76px; border-radius:50%;
+    background:
+      radial-gradient(circle at 32% 28%, #fff 0 8%, transparent 9%),
+      radial-gradient(circle at 66% 62%, #fff 0 5%, transparent 6%),
+      linear-gradient(155deg, var(--sun), var(--sun-strong));
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--sun-strong) 55%, transparent);
+    animation: float 3.2s ease-in-out infinite;
+  }
+  @keyframes float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
+
+  .app-name{ font-size:1.5rem; font-weight:700; letter-spacing:.01em; }
+  .tagline{ color:var(--ink-soft); font-size:.9rem; max-width:26ch; }
+
+  .field{
+    width:100%; max-width:280px;
+    border:2px solid var(--line);
+    background:var(--surface-2);
+    border-radius:16px;
+    padding:14px 16px;
+    font-size:1rem;
+    color:var(--ink);
+    text-align:center;
+    outline:none;
+  }
+  .field:focus-visible{ border-color:var(--sun-strong); }
+
+  .btn{
+    border:none; cursor:pointer; border-radius:999px;
+    padding:14px 26px; font-weight:600; font-size:.98rem;
+    background:var(--sun); color:var(--ink);
+    box-shadow:0 8px 22px color-mix(in srgb, var(--sun-strong) 45%, transparent);
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn:focus-visible, .field:focus-visible, .iconbtn:focus-visible, .chip:focus-visible, .navbtn:focus-visible{
+    outline:3px solid var(--coral); outline-offset:2px;
+  }
+  .btn--ghost{ background:transparent; color:var(--surface); border:2px solid color-mix(in srgb, var(--surface) 55%, transparent); box-shadow:none; }
+  .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+
+  .error-text{ color:var(--coral); font-size:.85rem; min-height:1.2em; font-weight:500; }
+
+  .welcome-quote{
+    font-size:clamp(1.25rem, 6vw, 1.7rem);
+    font-weight:700;
+    line-height:1.35;
+    max-width:22ch;
+  }
+
+  .who-grid{ display:flex; gap:14px; width:100%; max-width:320px; }
+  .who-card{
+    flex:1; border:2px solid var(--line); background:var(--surface-2);
+    border-radius:20px; padding:22px 10px; cursor:pointer;
+    font-family:'Unbounded', sans-serif; font-weight:600; font-size:1.05rem; color:var(--ink);
+  }
+  .who-card:hover{ border-color:var(--sun-strong); }
+  .who-emoji{ display:block; font-size:1.8rem; margin-bottom:8px; }
+
+  /* ============ MAIN APP ============ */
+  .topbar{
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px; border-bottom:1px solid var(--line);
+    background:var(--surface); flex:0 0 auto;
+  }
+  .topbar .mark{ width:34px; height:34px; animation:none; flex:0 0 auto; }
+  .topbar .who-you-are{ margin-left:auto; text-align:right; font-size:.75rem; color:var(--ink-soft); background:none; border:none; cursor:pointer; padding:4px; }
+  .topbar .who-you-are b{ color:var(--ink); font-weight:600; }
+  .topbar-titles{ line-height:1.2; }
+  .topbar-titles .app-name{ font-size:1rem; }
+  .topbar-titles .tagline{ font-size:.72rem; }
+
+  .content{ flex:1; min-height:0; position:relative; }
+  .tab-panel{ position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
+  .tab-panel[hidden]{ display:none; }
+  .scroll-area{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+
+  .state-msg{ margin:auto; text-align:center; color:var(--ink-soft); font-size:.92rem; padding:0 30px; }
+
+  .bottomnav{
+    display:flex; border-top:1px solid var(--line); background:var(--surface); flex:0 0 auto;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .navbtn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:9px 4px 10px; background:none; border:none; cursor:pointer; color:var(--ink-soft);
+  }
+  .navbtn svg{ width:22px; height:22px; }
+  .navbtn span{ font-size:.68rem; font-weight:500; }
+  .navbtn[aria-current="true"]{ color:var(--coral); }
+  .navbtn[aria-current="true"] svg{ color:var(--coral); }
+
+  /* ============ CHAT ============ */
+  .day-divider{ align-self:center; font-size:.72rem; color:var(--ink-soft); background:var(--surface-2); padding:4px 12px; border-radius:999px; margin:6px 0; }
+  .bubble-row{ display:flex; flex-direction:column; max-width:78%; gap:4px; }
+  .bubble-row.mine{ align-self:flex-end; align-items:flex-end; }
+  .bubble-row.theirs{ align-self:flex-start; align-items:flex-start; }
+  .bubble{ padding:10px 14px; border-radius:18px; font-size:.94rem; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
+  .mine .bubble{ background:var(--sun); color:var(--ink); border-bottom-right-radius:6px; }
+  .theirs .bubble{ background:var(--bubble-in); color:var(--ink); border-bottom-left-radius:6px; }
+  .bubble-time{ font-size:.66rem; color:var(--ink-soft); padding:0 4px; }
+  .reactions{ display:flex; gap:6px; flex-wrap:wrap; padding:0 4px; }
+  .chip{
+    border:1.5px solid var(--line); background:var(--surface); border-radius:999px;
+    font-size:.72rem; padding:3px 9px; cursor:pointer; color:var(--ink-soft); display:flex; gap:4px; align-items:center;
+  }
+  .chip.active{ background:var(--coral); border-color:var(--coral); color:#fff; }
+  .chip .n{ font-weight:600; }
+
+  .composer{ display:flex; gap:8px; align-items:flex-end; padding:10px 12px; border-top:1px solid var(--line); background:var(--surface); flex:0 0 auto; }
+  .composer textarea{
+    flex:1; resize:none; border:2px solid var(--line); border-radius:18px; padding:10px 14px;
+    font-family:inherit; font-size:.94rem; color:var(--ink); background:var(--surface-2); max-height:120px; outline:none;
+  }
+  .composer textarea:focus-visible{ border-color:var(--sun-strong); }
+  .sendbtn{
+    width:42px; height:42px; border-radius:50%; border:none; background:var(--sun); color:var(--ink);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto;
+  }
+  .sendbtn[disabled]{ opacity:.4; cursor:not-allowed; }
+  .sendbtn svg{ width:19px; height:19px; margin-left:2px; }
+
+  /* ============ LISTS (plans / wishes) ============ */
+  .add-row{ display:flex; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line); flex:0 0 auto; }
+  .add-row input{
+    flex:1; border:2px solid var(--line); border-radius:14px; padding:10px 12px;
+    font-family:inherit; font-size:.92rem; background:var(--surface-2); color:var(--ink); outline:none;
+  }
+  .add-row input:focus-visible{ border-color:var(--sun-strong); }
+  .add-row button{
+    width:42px; border-radius:14px; border:none; background:var(--coral); color:#fff; font-size:1.3rem; cursor:pointer;
+  }
+  .add-row button[disabled]{ opacity:.4; cursor:not-allowed; }
+
+  .list-item{ display:flex; gap:12px; align-items:flex-start; background:var(--surface-2); border-radius:16px; padding:12px 14px; }
+  .list-item .toggle{
+    flex:0 0 auto; width:24px; height:24px; border-radius:8px; border:2px solid var(--line); background:var(--surface);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; margin-top:1px;
+  }
+  .list-item .toggle.done{ background:var(--ocean-1); border-color:var(--ocean-1); color:#fff; }
+  .list-item.wish .toggle{ border-radius:50%; }
+  .list-item.wish .toggle.done{ background:var(--coral); border-color:var(--coral); }
+  .list-item .toggle svg{ width:15px; height:15px; }
+  .list-item .body{ flex:1; min-width:0; }
+  .list-item .text{ font-size:.94rem; line-height:1.4; word-break:break-word; }
+  .list-item.done .text{ text-decoration:line-through; color:var(--ink-soft); }
+  .list-item .meta{ font-size:.7rem; color:var(--ink-soft); margin-top:4px; }
+  .list-item .del{ flex:0 0 auto; background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:1rem; padding:2px 4px; }
+
+  /* ============ MEMORIES ============ */
+  .mem-toolbar{ padding:12px 16px; border-bottom:1px solid var(--line); flex:0 0 auto; }
+  .mem-add-btn{
+    width:100%; border:none; border-radius:16px; background:var(--sun); color:var(--ink);
+    font-weight:600; font-size:.92rem; padding:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .mem-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; padding:16px; overflow-y:auto; }
+  .mem-thumb{ position:relative; border-radius:16px; overflow:hidden; aspect-ratio:1; cursor:pointer; background:var(--surface-2); border:none; padding:0; }
+  .mem-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .lightbox{ position:fixed; inset:0; background:rgba(8,20,22,.86); display:flex; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .lightbox[hidden]{ display:none; }
+  .lightbox-card{ max-width:420px; width:100%; background:var(--surface); border-radius:20px; overflow:hidden; }
+  .lightbox-card img{ width:100%; display:block; max-height:60vh; object-fit:contain; background:#000; }
+  .lightbox-info{ padding:14px 16px; }
+  .lightbox-caption{ font-size:.92rem; margin-bottom:4px; }
+  .lightbox-meta{ font-size:.72rem; color:var(--ink-soft); }
+  .lightbox-close{ display:block; margin:12px auto 16px; background:none; border:none; color:var(--ink-soft); font-size:.85rem; cursor:pointer; }
+
+  .upload-panel{ position:fixed; inset:0; background:rgba(8,20,22,.86); display:flex; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .upload-panel[hidden]{ display:none; }
+  .upload-card{ max-width:360px; width:100%; background:var(--surface); border-radius:20px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+  .upload-card img{ width:100%; border-radius:14px; max-height:260px; object-fit:cover; }
+  .upload-card input{ border:2px solid var(--line); border-radius:12px; padding:10px 12px; font-family:inherit; background:var(--surface-2); color:var(--ink); outline:none; }
+  .upload-actions{ display:flex; gap:10px; }
+  .upload-actions .btn{ flex:1; }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--ink); color:var(--surface); padding:10px 18px; border-radius:999px; font-size:.85rem;
+    z-index:80; opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .toast.show{ opacity:1; }
+
+  .visually-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+</style>
+
+<div class="blob blob--a"></div>
+<div class="blob blob--b"></div>
+<div class="blob blob--c"></div>
+<div class="blob blob--d"></div>
+
+<div class="app-shell" id="appShell">
+
+  <!-- ===== GATE ===== -->
+  <section class="screen center-screen" id="screenGate">
+    <div class="mark" aria-hidden="true"></div>
+    <div class="app-name">Попчик</div>
+    <p class="tagline">Личный мессенджер только для вас двоих</p>
+    <form id="gateForm" style="display:flex; flex-direction:column; align-items:center; gap:12px; width:100%;">
+      <input class="field" id="gateInput" type="text" autocomplete="off" placeholder="Кодовое слово" inputmode="text">
+      <p class="error-text" id="gateError"></p>
+      <button class="btn" type="submit">Войти</button>
+    </form>
+  </section>
+
+  <!-- ===== WELCOME ===== -->
+  <section class="screen center-screen" id="screenWelcome" hidden>
+    <div class="mark" aria-hidden="true"></div>
+    <p class="welcome-quote">Помнишь, мы хотели создать отдельный мессенджер только для нас с тобой?) Вот он!</p>
+    <button class="btn" id="continueBtn">Продолжить →</button>
+  </section>
+
+  <!-- ===== WHO ===== -->
+  <section class="screen center-screen" id="screenWho" hidden>
+    <div class="mark" aria-hidden="true"></div>
+    <h2 class="app-name" style="font-size:1.15rem;">Это ты?</h2>
+    <div class="who-grid">
+      <button class="who-card" data-who="Лера"><span class="who-emoji">💛</span>Лера</button>
+      <button class="who-card" data-who="Лёша"><span class="who-emoji">🧡</span>Лёша</button>
+    </div>
+    <p class="tagline">Мы запомним это на этом устройстве</p>
+  </section>
+
+  <!-- ===== MAIN APP ===== -->
+  <section class="screen" id="screenApp" hidden>
+    <header class="topbar">
+      <div class="mark" aria-hidden="true"></div>
+      <div class="topbar-titles">
+        <div class="app-name">Попчик</div>
+        <div class="tagline" id="tabTitle">Чат</div>
+      </div>
+      <button class="who-you-are" id="whoSwitch">Ты: <b id="whoLabel">—</b><br>сменить</button>
+    </header>
+
+    <div class="content">
+      <!-- CHAT -->
+      <div class="tab-panel" data-tab="chat">
+        <div class="scroll-area" id="chatScroll">
+          <p class="state-msg" id="chatState">Загружаем переписку…</p>
+        </div>
+        <form class="composer" id="chatForm">
+          <textarea id="chatInput" rows="1" placeholder="Напиши что-нибудь…"></textarea>
+          <button class="sendbtn" type="submit" id="sendBtn" disabled aria-label="Отправить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- PLANS -->
+      <div class="tab-panel" data-tab="plans" hidden>
+        <form class="add-row" id="planForm">
+          <input id="planInput" type="text" autocomplete="off" placeholder="Новый план…">
+          <button type="submit" disabled aria-label="Добавить">+</button>
+        </form>
+        <div class="scroll-area" id="planScroll">
+          <p class="state-msg" id="planState">Загружаем…</p>
+        </div>
+      </div>
+
+      <!-- WISHES -->
+      <div class="tab-panel" data-tab="wishes" hidden>
+        <form class="add-row" id="wishForm">
+          <input id="wishInput" type="text" autocomplete="off" placeholder="Новое желание…">
+          <button type="submit" disabled aria-label="Добавить">+</button>
+        </form>
+        <div class="scroll-area" id="wishScroll">
+          <p class="state-msg" id="wishState">Загружаем…</p>
+        </div>
+      </div>
+
+      <!-- MEMORIES -->
+      <div class="tab-panel" data-tab="memories" hidden>
+        <div class="mem-toolbar">
+          <button class="mem-add-btn" id="memAddBtn" type="button">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Добавить фото
+          </button>
+          <input type="file" accept="image/*" id="memFileInput" class="visually-hidden">
+        </div>
+        <div class="mem-grid" id="memGrid">
+          <p class="state-msg" id="memState" style="grid-column:1/-1;">Загружаем…</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="bottomnav">
+      <button class="navbtn" data-tab="chat" aria-current="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="5"/><path d="M8 21l3-4h2l3 4"/></svg>
+        <span>Чат</span>
+      </button>
+      <button class="navbtn" data-tab="plans">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 3v2h6V3M8 11l2 2 4-4M8 16h6"/></svg>
+        <span>Планы</span>
+      </button>
+      <button class="navbtn" data-tab="wishes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 3 14.7 9.1 21.3 9.7 16.3 14 17.8 20.5 12 17 6.2 20.5 7.7 14 2.7 9.7 9.3 9.1"/></svg>
+        <span>Желания</span>
+      </button>
+      <button class="navbtn" data-tab="memories">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="14" height="14" rx="3"/><circle cx="11" cy="11" r="1.6"/><path d="M6 15l3-3 8 8"/><path d="M4 9V6a2 2 0 0 1 2-2h3"/></svg>
+        <span>Фото</span>
+      </button>
+    </nav>
+  </section>
+</div>
+
+<!-- lightbox for memory viewing -->
+<div class="lightbox" id="lightbox" hidden>
+  <div class="lightbox-card">
+    <img id="lightboxImg" alt="">
+    <div class="lightbox-info">
+      <p class="lightbox-caption" id="lightboxCaption"></p>
+      <p class="lightbox-meta" id="lightboxMeta"></p>
+    </div>
+  </div>
+  <button class="lightbox-close" id="lightboxClose">Закрыть ✕</button>
+</div>
+
+<!-- upload confirmation panel -->
+<div class="upload-panel" id="uploadPanel" hidden>
+  <div class="upload-card">
+    <img id="uploadPreview" alt="Предпросмотр фото">
+    <input type="text" id="uploadCaption" placeholder="Подпись (необязательно)…" autocomplete="off">
+    <div class="upload-actions">
+      <button class="btn" style="background:var(--surface-2); box-shadow:none;" id="uploadCancel" type="button">Отмена</button>
+      <button class="btn" id="uploadSave" type="button">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CODE_WORD = "попчик";
+  var LS_GATE = "popchik_gate_ok";
+  var LS_WHO = "popchik_who";
+
+  var state = { who: localStorage.getItem(LS_WHO) || null, activeTab: "chat" };
+
+  var els = {
+    gate: document.getElementById("screenGate"),
+    welcome: document.getElementById("screenWelcome"),
+    who: document.getElementById("screenWho"),
+    app: document.getElementById("screenApp"),
+    gateForm: document.getElementById("gateForm"),
+    gateInput: document.getElementById("gateInput"),
+    gateError: document.getElementById("gateError"),
+    continueBtn: document.getElementById("continueBtn"),
+    whoLabel: document.getElementById("whoLabel"),
+    whoSwitch: document.getElementById("whoSwitch"),
+    tabTitle: document.getElementById("tabTitle"),
+    toast: document.getElementById("toast")
+  };
+
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ els.toast.classList.remove("show"); }, 2600);
+  }
+
+  function uid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  }
+
+  /* ---------- onboarding flow ---------- */
+  function goto(screenEl){
+    [els.gate, els.welcome, els.who, els.app].forEach(function(s){ s.hidden = (s !== screenEl); });
+  }
+
+  function startApp(){
+    goto(els.app);
+    els.whoLabel.textContent = state.who;
+    initStore();
+  }
+
+  els.gateForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var val = (els.gateInput.value || "").trim().toLowerCase();
+    if (val === CODE_WORD){
+      localStorage.setItem(LS_GATE, "1");
+      els.gateError.textContent = "";
+      afterGate();
+    } else {
+      els.gateError.textContent = "Хм, не то. Попробуй ещё раз";
+    }
+  });
+
+  function afterGate(){
+    if (!state.who){
+      goto(els.welcome);
+    } else {
+      startApp();
+    }
+  }
+
+  els.continueBtn.addEventListener("click", function(){
+    if (state.who) startApp(); else goto(els.who);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".who-card"), function(btn){
+    btn.addEventListener("click", function(){
+      state.who = btn.getAttribute("data-who");
+      localStorage.setItem(LS_WHO, state.who);
+      startApp();
+    });
+  });
+
+  els.whoSwitch.addEventListener("click", function(){
+    localStorage.removeItem(LS_WHO);
+    state.who = null;
+    goto(els.who);
+  });
+
+  // resume where they left off
+  if (localStorage.getItem(LS_GATE) === "1"){
+    if (state.who) { startApp(); } else { goto(els.welcome); }
+  }
+
+  /* ---------- tabs ---------- */
+  var tabTitles = { chat:"Чат", plans:"Планы", wishes:"Желания", memories:"Воспоминания" };
+  Array.prototype.forEach.call(document.querySelectorAll(".navbtn"), function(btn){
+    btn.addEventListener("click", function(){
+      var tab = btn.getAttribute("data-tab");
+      state.activeTab = tab;
+      Array.prototype.forEach.call(document.querySelectorAll(".navbtn"), function(b){
+        b.setAttribute("aria-current", b === btn ? "true" : "false");
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(".tab-panel"), function(p){
+        p.hidden = (p.getAttribute("data-tab") !== tab);
+      });
+      els.tabTitle.textContent = tabTitles[tab];
+    });
+  });
+
+  /* ---------- helpers ---------- */
+  function el(tag, cls, text){
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function todayKey(d){
+    d = d || new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  function formatTime(ts){
+    var d = new Date(ts);
+    return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  }
+  var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+  function formatDivider(dateKey){
+    var parts = dateKey.split("-").map(Number);
+    var now = new Date();
+    if (parts[0]===now.getFullYear() && parts[1]-1===now.getMonth() && parts[2]===now.getDate()) return "Сегодня";
+    var yest = new Date(now); yest.setDate(now.getDate()-1);
+    if (parts[0]===yest.getFullYear() && parts[1]-1===yest.getMonth() && parts[2]===yest.getDate()) return "Вчера";
+    return parts[2] + " " + MONTHS[parts[1]-1];
+  }
+  function formatAgo(ts){
+    var diff = Date.now() - ts, min = Math.floor(diff/60000);
+    if (min < 1) return "только что";
+    if (min < 60) return min + " мин. назад";
+    var hr = Math.floor(min/60);
+    if (hr < 24) return hr + " ч. назад";
+    var day = Math.floor(hr/24);
+    if (day < 7) return day + " дн. назад";
+    var d = new Date(ts);
+    return d.getDate() + "." + String(d.getMonth()+1).padStart(2,"0") + "." + String(d.getFullYear()).slice(2);
+  }
+  function other(who){ return who === "Лера" ? "Лёша" : "Лера"; }
+
+  /* ================= LOCAL STORE =================
+     This build saves everything on THIS device (localStorage), so it
+     works with zero setup and no external dependency. It does not sync
+     between two different phones/computers yet — each device keeps its
+     own copy. See chat for how to upgrade this to real two-way sync. */
+  function lsGet(key, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e){ return fallback; }
+  }
+  function lsSet(key, value){
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch(e){
+      showToast("Хранилище на этом устройстве заполнено 😔 Освободите место (например, удалите старые фото) и попробуйте снова.");
+      return false;
+    }
+  }
+
+  function initStore(){
+    wireChat();
+    wireList("popchik_plans", false, "planScroll", "planForm", "planInput");
+    wireList("popchik_wishes", true, "wishScroll", "wishForm", "wishInput");
+    wireMemories();
+  }
+
+  /* ================= CHAT ================= */
+  function wireChat(){
+    var scroll = document.getElementById("chatScroll");
+    var form = document.getElementById("chatForm");
+    var input = document.getElementById("chatInput");
+    var sendBtn = document.getElementById("sendBtn");
+    var STORE_KEY = "popchik_chat_days";
+
+    function autoGrow(){
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 120) + "px";
+    }
+    input.addEventListener("input", function(){
+      autoGrow();
+      sendBtn.disabled = !input.value.trim();
+    });
+    input.addEventListener("keydown", function(e){
+      if (e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    var REACTIONS = [
+      { key:"popchik", label:"Попчик", emoji:"🍬" },
+      { key:"pripopka", label:"Припопка", emoji:"💛" },
+      { key:"otpopka", label:"Отпопка", emoji:"💢" }
+    ];
+
+    function toggleReaction(dateKey, msgId, key){
+      var days = lsGet(STORE_KEY, {});
+      if (!days[dateKey]) return;
+      days[dateKey] = days[dateKey].map(function(m){
+        if (m.id !== msgId) return m;
+        var reactions = Object.assign({}, m.reactions);
+        var arr = (reactions[key] || []).slice();
+        var idx = arr.indexOf(state.who);
+        if (idx >= 0) arr.splice(idx, 1); else arr.push(state.who);
+        reactions[key] = arr;
+        return Object.assign({}, m, { reactions: reactions });
+      });
+      lsSet(STORE_KEY, days);
+      render();
+    }
+
+    function render(){
+      var days = lsGet(STORE_KEY, {});
+      var all = [];
+      Object.keys(days).sort().forEach(function(dateKey){
+        (days[dateKey] || []).forEach(function(m){ all.push(Object.assign({}, m, { dateKey: dateKey })); });
+      });
+      all.sort(function(a,b){ return a.ts - b.ts; });
+
+      scroll.innerHTML = "";
+      if (all.length === 0){
+        scroll.appendChild(el("p", "state-msg", "Здесь пока тихо. Напиши первое сообщение! 💌"));
+        return;
+      }
+
+      var lastDivider = null;
+      all.forEach(function(m){
+        if (m.dateKey !== lastDivider){
+          scroll.appendChild(el("div", "day-divider", formatDivider(m.dateKey)));
+          lastDivider = m.dateKey;
+        }
+        var mine = m.from === state.who;
+        var row = el("div", "bubble-row " + (mine ? "mine" : "theirs"));
+        var bubble = el("div", "bubble", m.text);
+        row.appendChild(bubble);
+        row.appendChild(el("div", "bubble-time", formatTime(m.ts)));
+
+        var reacts = el("div", "reactions");
+        REACTIONS.forEach(function(r){
+          var list = (m.reactions && m.reactions[r.key]) || [];
+          var chip = el("button", "chip" + (list.indexOf(state.who) >= 0 ? " active" : ""));
+          chip.type = "button";
+          chip.appendChild(document.createTextNode(r.emoji + " " + r.label + " "));
+          if (list.length) chip.appendChild(el("span", "n", String(list.length)));
+          chip.addEventListener("click", function(){ toggleReaction(m.dateKey, m.id, r.key); });
+          reacts.appendChild(chip);
+        });
+        row.appendChild(reacts);
+        scroll.appendChild(row);
+      });
+      requestAnimationFrame(function(){ scroll.scrollTop = scroll.scrollHeight; });
+    }
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      autoGrow();
+      var dateKey = todayKey();
+      var days = lsGet(STORE_KEY, {});
+      var msg = { id: uid(), from: state.who, text: text, ts: Date.now(), reactions: {} };
+      days[dateKey] = (days[dateKey] || []).concat([msg]);
+      if (lsSet(STORE_KEY, days)) render();
+      sendBtn.disabled = !input.value.trim();
+    });
+
+    render();
+  }
+
+  /* ================= PLANS / WISHES (shared list logic) ================= */
+  function wireList(storeKey, isWish, scrollId, formId, inputId){
+    var scroll = document.getElementById(scrollId);
+    var form = document.getElementById(formId);
+    var input = document.getElementById(inputId);
+    var addBtn = form.querySelector("button");
+    var doneField = isWish ? "fulfilled" : "done";
+
+    input.addEventListener("input", function(){ addBtn.disabled = !input.value.trim(); });
+
+    function render(){
+      var items = lsGet(storeKey, []);
+      scroll.innerHTML = "";
+      if (items.length === 0){
+        scroll.appendChild(el("p", "state-msg", isWish ? "Вишлист пуст — самое время помечтать ⭐" : "Планов пока нет — придумайте первый вместе"));
+        return;
+      }
+      items.forEach(function(d){
+        var done = !!d[doneField];
+        var item = el("div", "list-item" + (isWish ? " wish" : "") + (done ? " done" : ""));
+
+        var toggleBtn = el("button", "toggle" + (done ? " done" : ""));
+        toggleBtn.type = "button";
+        toggleBtn.setAttribute("aria-label", isWish ? "Исполнено" : "Готово");
+        toggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        toggleBtn.addEventListener("click", function(){
+          var all = lsGet(storeKey, []).map(function(it){
+            if (it.id !== d.id) return it;
+            var patch = {};
+            patch[doneField] = !it[doneField];
+            return Object.assign({}, it, patch);
+          });
+          lsSet(storeKey, all);
+          render();
+        });
+
+        var body = el("div", "body");
+        body.appendChild(el("div", "text", d.text || ""));
+        body.appendChild(el("div", "meta", (d.addedBy || "—") + " · " + formatAgo(d.createdAt || 0)));
+
+        var delBtn = el("button", "del", "✕");
+        delBtn.type = "button";
+        delBtn.setAttribute("aria-label", "Удалить");
+        delBtn.addEventListener("click", function(){
+          lsSet(storeKey, lsGet(storeKey, []).filter(function(it){ return it.id !== d.id; }));
+          render();
+        });
+
+        item.appendChild(toggleBtn);
+        item.appendChild(body);
+        item.appendChild(delBtn);
+        scroll.appendChild(item);
+      });
+    }
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      addBtn.disabled = true;
+      var entry = { id: uid(), text: text, addedBy: state.who, createdAt: Date.now() };
+      entry[doneField] = false;
+      var items = lsGet(storeKey, []);
+      items.push(entry);
+      lsSet(storeKey, items);
+      render();
+    });
+
+    render();
+  }
+
+  /* ================= MEMORIES ================= */
+  function wireMemories(){
+    var storeKey = "popchik_memories";
+    var grid = document.getElementById("memGrid");
+    var addBtn = document.getElementById("memAddBtn");
+    var fileInput = document.getElementById("memFileInput");
+    var uploadPanel = document.getElementById("uploadPanel");
+    var uploadPreview = document.getElementById("uploadPreview");
+    var uploadCaption = document.getElementById("uploadCaption");
+    var uploadCancel = document.getElementById("uploadCancel");
+    var uploadSave = document.getElementById("uploadSave");
+    var lightbox = document.getElementById("lightbox");
+    var lightboxImg = document.getElementById("lightboxImg");
+    var lightboxCaption = document.getElementById("lightboxCaption");
+    var lightboxMeta = document.getElementById("lightboxMeta");
+    var lightboxClose = document.getElementById("lightboxClose");
+    var pendingDataUrl = null;
+
+    addBtn.addEventListener("click", function(){ fileInput.click(); });
+
+    fileInput.addEventListener("change", function(){
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = "";
+      if (!file) return;
+      compressImage(file).then(function(dataUrl){
+        pendingDataUrl = dataUrl;
+        uploadPreview.src = dataUrl;
+        uploadCaption.value = "";
+        uploadPanel.hidden = false;
+      }).catch(function(){
+        showToast("Не получилось обработать фото. Попробуй другое.");
+      });
+    });
+
+    function compressImage(file){
+      return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(e){
+          var img = new Image();
+          img.onload = function(){
+            var w = img.width, h = img.height, maxDim = 1000;
+            if (w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+            else if (h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+            var canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            var quality = 0.78;
+            var dataUrl = canvas.toDataURL("image/jpeg", quality);
+            while (dataUrl.length > 230000 && quality > 0.3){
+              quality -= 0.1;
+              dataUrl = canvas.toDataURL("image/jpeg", quality);
+            }
+            if (dataUrl.length > 250000){ reject(new Error("too_big")); return; }
+            resolve(dataUrl);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function closeUpload(){ uploadPanel.hidden = true; pendingDataUrl = null; }
+    uploadCancel.addEventListener("click", closeUpload);
+    uploadSave.addEventListener("click", function(){
+      if (!pendingDataUrl) return;
+      uploadSave.disabled = true;
+      var items = lsGet(storeKey, []);
+      items.unshift({
+        id: uid(),
+        image: pendingDataUrl,
+        caption: uploadCaption.value.trim(),
+        addedBy: state.who,
+        createdAt: Date.now()
+      });
+      var ok = lsSet(storeKey, items);
+      uploadSave.disabled = false;
+      if (ok){ closeUpload(); render(); }
+    });
+
+    lightboxClose.addEventListener("click", function(){ lightbox.hidden = true; });
+    lightbox.addEventListener("click", function(e){ if (e.target === lightbox) lightbox.hidden = true; });
+
+    function render(){
+      var items = lsGet(storeKey, []);
+      grid.innerHTML = "";
+      if (items.length === 0){
+        var msg = el("p", "state-msg", "Пока пусто — добавьте первое воспоминание!");
+        msg.style.gridColumn = "1 / -1";
+        grid.appendChild(msg);
+        return;
+      }
+      items.forEach(function(d){
+        var thumb = el("button", "mem-thumb");
+        thumb.type = "button";
+        var img = document.createElement("img");
+        img.src = d.image;
+        img.alt = d.caption || "Воспоминание";
+        thumb.appendChild(img);
+        thumb.addEventListener("click", function(){
+          lightboxImg.src = d.image;
+          lightboxCaption.textContent = d.caption || "";
+          lightboxCaption.hidden = !d.caption;
+          lightboxMeta.textContent = (d.addedBy || "—") + " · " + formatAgo(d.createdAt || 0);
+          lightbox.hidden = false;
+        });
+        grid.appendChild(thumb);
+      });
+    }
+
+    render();
+  }
+})();
+</script>
